@@ -1,0 +1,481 @@
+// Fill out your copyright notice in the Description page of Project Settings.
+
+
+#include "BatteryMan.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "GameFramework/Actor.h"
+#include "Kismet/GameplayStatics.h"
+#include "time.h"
+
+// Sets default values
+ABatteryMan::ABatteryMan()
+{
+ 	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
+	PrimaryActorTick.bCanEverTick = true;
+
+	GetCapsuleComponent()->InitCapsuleSize(42.0f, 96.0f);
+
+	bUseControllerRotationPitch = false;
+	bUseControllerRotationYaw = false;
+	bUseControllerRotationRoll = false;
+
+	GetCharacterMovement()->bOrientRotationToMovement = true;
+	GetCharacterMovement()->RotationRate = FRotator(0.0f, 540.0f, 0.0f);
+	GetCharacterMovement()->JumpZVelocity = 500.0f;
+	GetCharacterMovement()->AirControl = 1.0f;
+
+	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
+	CameraBoom->SetupAttachment(RootComponent);
+
+	CameraBoom->TargetArmLength = 300.0f;
+	CameraBoom->bUsePawnControlRotation = true;
+
+	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
+	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
+	FollowCamera->bUsePawnControlRotation = false;
+
+	bDead = false;
+	foot = false;
+	Power = 100.0f;
+	Item = 0.0f;
+	Item2 = 0.0f;
+	Item3 = 0.0f;
+	Score = 0.0f;
+	PowerEX = 0.0f;
+	HighScore;
+	
+}
+
+
+
+// Called when the game starts or when spawned
+void ABatteryMan::BeginPlay()
+{
+	Super::BeginPlay();
+
+	GetCapsuleComponent()->OnComponentBeginOverlap.AddDynamic(this, &ABatteryMan::OnBeginOverlap);
+
+	if(Player_Power_Widget_Class != nullptr) {
+
+		Player_Power_Widget = CreateWidget(GetWorld(), Player_Power_Widget_Class);
+		Player_Power_Widget->AddToViewport();
+	}
+	
+}
+
+// Called every frame
+void ABatteryMan::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+	
+	if (Item3 > 0 && PowerEX > 0 && Item > 0 && Item2 > 0) //1
+	{
+		Item -= DeltaTime * Item_Treshold;
+		Item3 -= DeltaTime * Item3_Treshold;
+		Item2 -= DeltaTime * Item2_Treshold;
+		PowerEX -= DeltaTime * PowerEx_Treshold;
+		
+	}
+
+	else if (Item3 > 0 && PowerEX > 0 && Item > 0 && Item2 <= 0) //2
+	{
+		Item -= DeltaTime * Item_Treshold;
+		Item3 -= DeltaTime * Item3_Treshold;
+		PowerEX -= DeltaTime * PowerEx_Treshold;
+		
+	}
+
+	else if (Item3 > 0 && PowerEX <= 0 && Item > 0 && Item2 > 0) //3
+	{
+		Item -= DeltaTime * Item_Treshold;
+		Item3 -= DeltaTime * Item3_Treshold;
+		Item2 -= DeltaTime * Item2_Treshold;
+		Power -= DeltaTime * Power_Treshold;
+		
+	}
+
+	else if (Item3 > 0 && PowerEX <= 0 && Item <= 0 && Item2 > 0) //4
+	{
+		Item2 -= DeltaTime * Item2_Treshold;
+		Item3 -= DeltaTime * Item3_Treshold;
+		Power -= DeltaTime * Power_Treshold;
+		
+	}
+
+	else if (Item3 > 0 && PowerEX > 0 && Item <= 0 && Item2 > 0) //5
+	{
+		Item3 -= DeltaTime * Item3_Treshold;
+		Item2 -= DeltaTime * Item2_Treshold;
+		PowerEX -= DeltaTime * PowerEx_Treshold;
+		
+	}
+
+	else if (Item3 > 0 && PowerEX <= 0 && Item <= 0 && Item2 <= 0) //6
+	{
+		Item3 -= DeltaTime * Item3_Treshold;
+		Power -= DeltaTime * Power_Treshold;
+		
+	}
+
+	else if (Item3 > 0 && PowerEX > 0 && Item <= 0 && Item2 <= 0) //7
+	{
+		Item3 -= DeltaTime * Item3_Treshold;
+		PowerEX -= DeltaTime * PowerEx_Treshold;
+		
+	}
+
+	else if (Item3 > 0 && PowerEX <= 0 && Item > 0 && Item2 <= 0) //8
+	{
+		Item3 -= DeltaTime * Item3_Treshold;
+		Item -= DeltaTime * Item_Treshold;
+		Power -= DeltaTime * Power_Treshold;
+		
+	}
+
+
+	else if (PowerEX > 0 && Item > 0 && Item3 <= 0  && Item2 <= 0) //9
+	{
+		Item -= DeltaTime * Item_Treshold;
+		PowerEX -= DeltaTime * PowerEx_Treshold;
+
+	}
+
+	else if (PowerEX <= 0 && Item > 0 && Item3 <= 0 && Item2 > 0) //10
+	{
+		Item -= DeltaTime * Item_Treshold;
+		Item2 -= DeltaTime * Item2_Treshold;
+		Power -= DeltaTime * Power_Treshold;
+
+	}
+
+	else if (PowerEX <= 0 && Item <= 0 && Item3 <= 0 && Item2 > 0) //11
+	{
+		
+		Power -= DeltaTime * Power_Treshold;
+		Item2 -= DeltaTime * Item2_Treshold;
+
+	}
+	
+	else if (PowerEX > 0 && Item <= 0 && Item3 <= 0 && Item2 <= 0) //12
+	{  
+		PowerEX -= DeltaTime * PowerEx_Treshold;
+		
+	}
+	else if (PowerEX <= 0 && Item <= 0 && Item3 <= 0 && Item2 <= 0) //13
+	{
+		Power -= DeltaTime * Power_Treshold;
+	}
+	else if (Item > 0 && Item3 <= 0 && PowerEX > 0 && Item2 > 0)//14
+	{
+		Item -= DeltaTime * Item_Treshold;
+		PowerEX -= DeltaTime * PowerEx_Treshold;
+		Item2 -= DeltaTime * Item2_Treshold;
+		//Item3 -= DeltaTime * Item3_Treshold;
+
+	}
+	else if (Item <= 0 && Item3 <= 0 && PowerEX > 0 && Item2 > 0)//15
+	{
+		PowerEX -= DeltaTime * PowerEx_Treshold;
+		Item2 -= DeltaTime * Item2_Treshold;
+	}
+
+	else if (Item > 0 && Item3 <= 0 && PowerEX <= 0 && Item2 <= 0) //16
+	{
+		Item -= DeltaTime * Item_Treshold;
+		Power -= DeltaTime * Power_Treshold;
+	}
+	
+	if (Item3 <= 0)
+	{
+	foot = false;
+	Item3 = 0;
+	}
+
+
+	
+  
+if (Power <= 0) {
+
+		if (!bDead) {
+			bDead = true;
+			Item = 0;
+			PowerEX = 0;
+			Item2 = 0.0f;
+			Item3 = 0.0f;
+
+			GetMesh()->SetSimulatePhysics(true);
+
+			FTimerHandle UnusedHandle;
+			GetWorldTimerManager().SetTimer(
+				UnusedHandle, this, &ABatteryMan::RestartGame, 3.0f, false);
+
+		}
+	}
+	else if (Item > 0)
+	{
+	GetCharacterMovement()->JumpZVelocity = 800.0f;
+	}
+
+	else if (Item <= 0 && Item2 <= 0)
+	{
+		
+		if (GetCharacterMovement()->JumpZVelocity != 500.0f)
+		{
+			GetCharacterMovement()->JumpZVelocity = 500.0f;
+		}
+	}
+
+	else if (Item2 <= 0)
+{
+	Item2 = 0;
+}
+
+	else if (Item <= 0)
+{
+	Item = 0;
+}
+
+
+ 
+	else if (PowerEX <= 0)
+	 {
+		 PowerEX = 0;
+	 }
+
+	else if (Item3 <= 0)
+	{
+	foot = false;
+	Item3 = 0;
+	}
+
+
+}
+
+// Called to bind functionality to input
+void ABatteryMan::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
+{
+	Super::SetupPlayerInputComponent(PlayerInputComponent);
+
+	PlayerInputComponent->BindAxis("Turn", this, &APawn::AddControllerYawInput);
+	PlayerInputComponent->BindAxis("LookUp", this, &APawn::AddControllerPitchInput);
+
+	PlayerInputComponent->BindAction("Jump", IE_Pressed, this, &ACharacter::Jump);
+	PlayerInputComponent->BindAction("Jump", IE_Released, this, &ACharacter::StopJumping);
+
+	PlayerInputComponent->BindAxis("MoveForward", this, &ABatteryMan::MoveForward);
+	PlayerInputComponent->BindAxis("MoveRight", this, &ABatteryMan::MoveRight);
+}
+
+
+
+void ABatteryMan::MoveForward(float Axis)
+{
+
+	if (!bDead)
+	{
+		const FRotator Rotation = Controller->GetControlRotation();
+		const FRotator YawRotation(30, Rotation.Yaw, 30);
+
+		const FVector Direction = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
+		AddMovementInput(Direction, Axis);
+	}
+}
+
+void ABatteryMan::MoveRight(float Axis)
+{
+	if (!bDead)
+	{
+		const FRotator Rotation = Controller->GetControlRotation();
+		const FRotator YawRotation(0, Rotation.Yaw,0);
+		
+
+		const FVector Direction = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
+		AddMovementInput(Direction, Axis);
+	}
+}
+
+
+void ABatteryMan::RestartGame()
+{
+
+	UGameplayStatics::OpenLevel(this, FName(*GetWorld()->GetName()), false);
+
+}
+
+void ABatteryMan::NextLevel()
+{
+	UGameplayStatics::OpenLevel(this, "Map02");
+}
+
+void ABatteryMan::NextLevel2()
+{
+	UGameplayStatics::OpenLevel(this, "Map03");
+}
+
+void ABatteryMan::NextLevel3()
+{
+	UGameplayStatics::OpenLevel(this, "Win");
+}
+
+void ABatteryMan::OnBeginOverlap(UPrimitiveComponent* Hitcomp,
+	AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex,
+	bool bFromSweep, const FHitResult& SweepResult)
+{
+
+	if (Score > HighScore)
+	{
+		HighScore = Score;
+	}
+
+	if (OtherActor->ActorHasTag("Recharge"))
+	{
+		Power += 20.0f;
+		Score += 1.0f;
+			
+		if (Power > 100.0f)
+			Power = 100.0f;
+		
+
+		OtherActor->Destroy();
+	}
+	
+	if (OtherActor->ActorHasTag("JumpHighEX"))
+	{
+		Item += 100.0f;
+		
+		if (Item2 > 0)
+		{
+			Item2 = 0;
+		}
+
+		OtherActor->Destroy();
+	}
+
+	if (OtherActor->ActorHasTag("PowerEx"))
+	{
+		PowerEX += 100.0f;
+
+
+		OtherActor->Destroy();
+	}
+
+	if (OtherActor->ActorHasTag("lava"))
+	{
+		bDead = true;
+		Power = 0;
+		Item = 0;
+		PowerEX = 0;
+		Item2 = 0.0f;
+		Item3 = 0.0f;
+
+		GetMesh()->SetSimulatePhysics(true);
+
+		FTimerHandle UnusedHandle;
+		GetWorldTimerManager().SetTimer(
+			UnusedHandle, this, &ABatteryMan::RestartGame, 3.0f, false);
+
+		OtherActor->Destroy();
+	}
+
+	if (OtherActor->ActorHasTag("deleat") && foot == false)
+	{
+		bDead = true;
+		Power = 0;
+		Item = 0;
+		PowerEX = 0;
+		Item2 = 0.0f;
+		Item3 = 0.0f;
+	
+		GetMesh()->SetSimulatePhysics(true);
+
+		FTimerHandle UnusedHandle;
+		GetWorldTimerManager().SetTimer(
+			UnusedHandle, this, &ABatteryMan::RestartGame, 3.0f, false);
+	}
+
+	if (OtherActor->ActorHasTag("door"))
+	{
+
+		FTimerHandle UnusedHandle;
+		GetWorldTimerManager().SetTimer(
+			UnusedHandle, this, &ABatteryMan::NextLevel, 0.1f, false);
+	}
+
+
+	if (OtherActor->ActorHasTag("door2"))
+	{
+
+		FTimerHandle UnusedHandle;
+		GetWorldTimerManager().SetTimer(
+			UnusedHandle, this, &ABatteryMan::NextLevel2, 0.1f, false);
+	}
+
+
+	if (OtherActor->ActorHasTag("door3"))
+	{
+
+		FTimerHandle UnusedHandle;
+		GetWorldTimerManager().SetTimer(
+			UnusedHandle, this, &ABatteryMan::NextLevel3, 0.1f, false);
+	}
+
+	if (OtherActor->ActorHasTag("debuff"))
+	{
+		Power_Treshold = 30.0f;
+		
+		OtherActor->Destroy();
+	}
+
+	if (OtherActor->ActorHasTag("undebuff"))
+	{
+		Power_Treshold = 5.0f;
+
+		OtherActor->Destroy();
+	}
+
+	if (OtherActor->ActorHasTag("lowjump"))
+	{
+		Item2 += 50.0f;
+		
+		if (Item > 0)
+		{
+			Item = 0;
+		}
+		GetCharacterMovement()->JumpZVelocity = 200.0f;
+
+		OtherActor->Destroy();
+	}
+
+	if (OtherActor->ActorHasTag("foot"))
+	{
+		Item3 += 100.0f;
+		
+		foot = true;
+
+		OtherActor->Destroy();
+	}
+	
+	if (OtherActor->ActorHasTag("Recharge2"))
+	{
+		Power += 50.0f;
+		Score += 2.0f;
+
+		if (Power > 100.0f)
+			Power = 100.0f;
+
+
+		OtherActor->Destroy();
+	}
+	
+	if (OtherActor->ActorHasTag("Recharge3"))
+	{
+		Power += 100.0f;
+		Score += 5.0f;
+
+		if (Power > 100.0f)
+			Power = 100.0f;
+
+
+		OtherActor->Destroy();
+	}
+}
